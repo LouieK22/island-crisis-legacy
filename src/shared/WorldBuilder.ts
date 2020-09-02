@@ -7,26 +7,42 @@ export enum TileType {
 }
 
 export interface TileDefinition {
+	/**
+	 * x/z coordinate of tile
+	 */
 	Position: Vector2int16;
+
 	Type: TileType;
 }
 
-export interface MapDefinition {
-	Seed: number;
-	Tiles: Map<number, Map<number, TileDefinition>>;
+export interface MapConfig {
 	Radius: number;
 	DepthScale: number;
+	Seed?: number;
 }
 
-export function BuildMapDefinition(radius: number, depth: number, seed?: number): MapDefinition {
+export interface MapDefinition {
+	Config: Required<MapConfig>;
+
+	/**
+	 * 2D Map of every tile
+	 */
+	Tiles: Map<number, Map<number, TileDefinition>>;
+}
+
+export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	const tiles: Map<number, Map<number, TileDefinition>> = new Map();
-	if (seed === undefined) {
-		seed = math.random();
+	if (config.Seed === undefined) {
+		config.Seed = math.random();
 	}
 
 	// Create initial map
-	for (let cubeX = -radius; cubeX <= radius; cubeX++) {
-		for (let cubeY = math.max(-radius, -cubeX - radius); cubeY <= math.min(radius, -cubeX + radius); cubeY++) {
+	for (let cubeX = -config.Radius; cubeX <= config.Radius; cubeX++) {
+		for (
+			let cubeY = math.max(-config.Radius, -cubeX - config.Radius);
+			cubeY <= math.min(config.Radius, -cubeX + config.Radius);
+			cubeY++
+		) {
 			const cubeZ = -cubeX - cubeY;
 
 			let zMap = tiles.get(cubeX);
@@ -37,7 +53,7 @@ export function BuildMapDefinition(radius: number, depth: number, seed?: number)
 
 			if (zMap) {
 				let tileType = TileType.Empty;
-				const yNoise = calculateDecayingNoise(cubeX, cubeZ, seed, radius);
+				const yNoise = calculateDecayingNoise(cubeX, cubeZ, config.Seed, config.Radius);
 
 				if (yNoise <= -0.4) {
 					tileType = TileType.Water;
@@ -65,7 +81,7 @@ export function BuildMapDefinition(radius: number, depth: number, seed?: number)
 				const neighborKey = `${neighbor.X},${neighbor.Y}`;
 
 				if (!visited.has(neighborKey)) {
-					const yNoise = calculateDecayingNoise(neighbor.X, neighbor.Y, seed, radius);
+					const yNoise = calculateDecayingNoise(neighbor.X, neighbor.Y, config.Seed, config.Radius);
 
 					if (yNoise <= -0.4) {
 						visited.set(neighborKey, false);
@@ -96,10 +112,8 @@ export function BuildMapDefinition(radius: number, depth: number, seed?: number)
 	}
 
 	return {
+		Config: config as Required<MapConfig>,
 		Tiles: tiles,
-		Seed: seed,
-		Radius: radius,
-		DepthScale: depth,
 	};
 }
 
@@ -121,16 +135,16 @@ export function BuildTerrain(mapDef: MapDefinition) {
 			const x = tileDef.Position.X;
 			const z = tileDef.Position.Y;
 
-			let yNoise = calculateDecayingNoise(x, z, mapDef.Seed, mapDef.Radius);
+			let yNoise = calculateDecayingNoise(x, z, mapDef.Config.Seed, mapDef.Config.Radius);
 			if (tileDef.Type === TileType.Water) {
 				yNoise = -0.4;
 			}
 
 			const newTile = ReplicatedStorage.Tile.Clone();
-			newTile.Size = new Vector3(newTile.Size.X, mapDef.DepthScale * 2, newTile.Size.Z);
+			newTile.Size = new Vector3(newTile.Size.X, mapDef.Config.DepthScale * 2, newTile.Size.Z);
 			newTile.Position = new Vector3(
 				(x + z * 0.5) * (innerRadius * 2),
-				yNoise * mapDef.DepthScale,
+				yNoise * mapDef.Config.DepthScale,
 				z * outerRadius * 1.5,
 			);
 

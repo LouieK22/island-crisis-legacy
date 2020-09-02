@@ -1,5 +1,10 @@
 import { BuildTerrain, BuildMapDefinition } from "shared/WorldBuilder";
 
-BuildTerrain(BuildMapDefinition(50, 5));
+BuildTerrain(
+	BuildMapDefinition({
+		Radius: 25,
+		DepthScale: 5,
+	}),
+);
 
 export {};
