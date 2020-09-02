@@ -105,7 +105,14 @@ export function BuildMapDefinition(radius: number, depth: number, seed?: number)
 }
 
 export function BuildTerrain(mapDef: MapDefinition) {
-	Workspace.WorldMap.ClearAllChildren();
+	let worldMap = Workspace.FindFirstChild("WorldMap") as Folder | undefined;
+	if (!worldMap) {
+		worldMap = new Instance("Folder");
+		worldMap.Name = "WorldMap";
+		worldMap.Parent = Workspace;
+	}
+
+	worldMap.ClearAllChildren();
 
 	const outerRadius = 5;
 	const innerRadius = outerRadius * (math.sqrt(3) / 2);
@@ -163,7 +170,7 @@ export function BuildTerrain(mapDef: MapDefinition) {
 			textLabel.TextColor3 = new Color3(1, 1, 1);
 			textLabel.Parent = surfaceGui;
 
-			newTile.Parent = Workspace.WorldMap;
+			newTile.Parent = worldMap;
 		}
 	}
 }
