@@ -4,7 +4,6 @@ import { calculateDecayingNoise, GetNearbyTileCoordinates } from "shared/HexUtil
 export enum TileType {
 	Empty,
 	Water,
-	Lava,
 }
 
 export interface TileDefinition {
@@ -124,7 +123,6 @@ export function BuildTerrain(mapDef: MapDefinition) {
 
 			let yNoise = calculateDecayingNoise(x, z, mapDef.Seed, mapDef.Radius);
 			if (tileDef.Type === TileType.Water) {
-				// || tileDef.Type === TileType.Lava) {
 				yNoise = -0.4;
 			}
 
@@ -145,11 +143,6 @@ export function BuildTerrain(mapDef: MapDefinition) {
 				case TileType.Water:
 					newTile.Material = Enum.Material.Plastic;
 					newTile.Color = Color3.fromRGB(51, 88, 130);
-
-					break;
-				case TileType.Lava:
-					newTile.Material = Enum.Material.Slate;
-					newTile.Color = new Color3(1, 0, 0);
 
 					break;
 				default:
