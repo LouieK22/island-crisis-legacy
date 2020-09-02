@@ -1,5 +1,5 @@
 import { Workspace, ReplicatedStorage } from "@rbxts/services";
-import { calculateDecayingNoise, GetNearbyTileCoordinates } from "shared/HexUtil";
+import { AxialCoordinates, axialKey, calculateDecayingNoise, GetNearbyTileCoordinates } from "shared/HexUtil";
 
 export enum TileType {
 	Empty,
@@ -7,10 +7,7 @@ export enum TileType {
 }
 
 export interface TileDefinition {
-	/**
-	 * x/z coordinate of tile
-	 */
-	Position: Vector2int16;
+	Position: AxialCoordinates;
 
 	Type: TileType;
 }
@@ -53,14 +50,19 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 
 			if (zMap) {
 				let tileType = TileType.Empty;
-				const yNoise = calculateDecayingNoise(cubeX, cubeZ, config.Seed, config.Radius);
+				const axial = {
+					X: cubeX,
+					Z: cubeZ,
+				};
 
-				if (yNoise <= -0.4) {
+				const height = calculateDecayingNoise(axial, config.Seed, config.Radius);
+
+				if (height <= -0.4) {
 					tileType = TileType.Water;
 				}
 
 				zMap.set(cubeZ, {
-					Position: new Vector2int16(cubeX, cubeZ),
+					Position: axial,
 					Type: tileType,
 				});
 			}
@@ -69,7 +71,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 
 	// Flood-fill to determine which tiles make up the central island
 	const visited: Map<string, boolean> = new Map();
-	const toVisit: Array<Vector2int16> = [new Vector2int16(0, 0)];
+	const toVisit: Array<AxialCoordinates> = [{ X: 0, Z: 0 }];
 	visited.set("0,0", true);
 
 	let visitIdx = 0;
@@ -78,12 +80,12 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 
 		if (tile) {
 			for (const neighbor of GetNearbyTileCoordinates(tile)) {
-				const neighborKey = `${neighbor.X},${neighbor.Y}`;
+				const neighborKey = axialKey(neighbor);
 
 				if (!visited.has(neighborKey)) {
-					const yNoise = calculateDecayingNoise(neighbor.X, neighbor.Y, config.Seed, config.Radius);
+					const height = calculateDecayingNoise(neighbor, config.Seed, config.Radius);
 
-					if (yNoise <= -0.4) {
+					if (height <= -0.4) {
 						visited.set(neighborKey, false);
 					} else {
 						visited.set(neighborKey, true);
@@ -102,7 +104,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	for (const [_, zMap] of tiles) {
 		for (const [_, tile] of zMap) {
 			if (tile.Type === TileType.Empty) {
-				const visitGood = visited.get(`${tile.Position.X},${tile.Position.Y}`);
+				const visitGood = visited.get(axialKey(tile.Position));
 
 				if (!visitGood) {
 					tile.Type = TileType.Water;
@@ -133,18 +135,18 @@ export function BuildTerrain(mapDef: MapDefinition) {
 	for (const [_, rowDef] of mapDef.Tiles) {
 		for (const [_, tileDef] of rowDef) {
 			const x = tileDef.Position.X;
-			const z = tileDef.Position.Y;
+			const z = tileDef.Position.Z;
 
-			let yNoise = calculateDecayingNoise(x, z, mapDef.Config.Seed, mapDef.Config.Radius);
+			let height = calculateDecayingNoise(tileDef.Position, mapDef.Config.Seed, mapDef.Config.Radius);
 			if (tileDef.Type === TileType.Water) {
-				yNoise = -0.4;
+				height = -0.4;
 			}
 
 			const newTile = ReplicatedStorage.Tile.Clone();
 			newTile.Size = new Vector3(newTile.Size.X, mapDef.Config.DepthScale * 2, newTile.Size.Z);
 			newTile.Position = new Vector3(
 				(x + z * 0.5) * (innerRadius * 2),
-				yNoise * mapDef.Config.DepthScale,
+				height * mapDef.Config.DepthScale,
 				z * outerRadius * 1.5,
 			);
 
@@ -169,7 +171,7 @@ export function BuildTerrain(mapDef: MapDefinition) {
 			surfaceGui.Parent = newTile;
 
 			const textLabel = new Instance("TextLabel");
-			textLabel.Text = `${tileDef.Position.X}\n${tileDef.Position.Y}`;
+			textLabel.Text = `${tileDef.Position.X}\n${tileDef.Position.Z}`;
 			textLabel.Size = new UDim2(1, 0, 1, 0);
 			textLabel.BackgroundTransparency = 1;
 			textLabel.TextSize = 200;
