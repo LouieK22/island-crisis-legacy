@@ -1,16 +1,5 @@
-import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
-import { GetNearbyTileCoordinates } from "shared/HexUtil";
-
-const distance = (x: number, z: number) => {
-	return math.sqrt(math.abs(x) ** 2.1 + math.abs(z) ** 2.1);
-};
-
-const calculateDecayingNoise = (x: number, z: number, seed: number, decayCounterFactor: number) => {
-	let yNoise = math.noise(x / 6, z / 6, seed);
-	yNoise = yNoise - distance(x, z) / decayCounterFactor;
-
-	return math.max(yNoise, -0.4);
-};
+import { Workspace, ReplicatedStorage } from "@rbxts/services";
+import { calculateDecayingNoise, GetNearbyTileCoordinates } from "shared/HexUtil";
 
 export enum TileType {
 	Empty,
@@ -32,7 +21,7 @@ export interface MapDefinition {
 
 export function BuildMapDefinition(radius: number, depth: number, seed?: number): MapDefinition {
 	const tiles: Map<number, Map<number, TileDefinition>> = new Map();
-	if (!seed) {
+	if (seed === undefined) {
 		seed = math.random();
 	}
 
