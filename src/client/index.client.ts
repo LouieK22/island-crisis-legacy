@@ -7,7 +7,14 @@ const mapDef = BuildMapDefinition({
 	Radius: 100,
 	DepthScale: 5,
 	WaterLevel: -0.4,
-	TotalTowns: 100,
+	TotalTowns: 50,
+	Seed: 0.18867828086815,
+	GenerateBiomes: false,
+
+	Debug: {
+		ShowCoords: false,
+		VisualizeBiomes: true,
+	},
 });
 
 t1();

@@ -1,4 +1,5 @@
-import type { TileDefinition, TileType } from "shared/WorldBuilder";
+import { TileType } from "shared/BiomeManager";
+import type { TileDefinition } from "shared/WorldBuilder";
 
 const globalRand = new Random();
 
@@ -24,9 +25,14 @@ export function cubeAdd(cube1: CubeCoordinates, cube2: CubeCoordinates): CubeCoo
 }
 
 export function axialToCube(axial: AxialCoordinates): CubeCoordinates {
+	let cubeY = -axial.X - axial.Z;
+	if (cubeY === 0) {
+		cubeY = 0;
+	}
+
 	return {
 		X: axial.X,
-		Y: -axial.X - axial.Z,
+		Y: cubeY,
 		Z: axial.Z,
 	};
 }
@@ -64,7 +70,15 @@ export function getNearbyCoordinates(origin: AxialCoordinates, range: number): A
 
 	for (let cubeX = -range; cubeX <= range; cubeX++) {
 		for (let cubeY = math.max(-range, -cubeX - range); cubeY <= math.min(range, -cubeX + range); cubeY++) {
-			const cubeZ = -cubeX - cubeY;
+			let cubeZ = -cubeX - cubeY;
+			if (cubeZ === 0) {
+				cubeZ = 0;
+			}
+
+			if (cubeX === 0 && cubeZ === 0) {
+				cubeY++;
+				continue;
+			}
 
 			output.push(
 				cubeAdd(cubeOrigin, {

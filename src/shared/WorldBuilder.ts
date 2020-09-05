@@ -1,4 +1,5 @@
 import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
+import { BiomeManager, TileType } from "shared/BiomeManager";
 import {
 	AxialCoordinates,
 	axialKey,
@@ -8,32 +9,32 @@ import {
 	TileMap,
 } from "shared/HexUtil";
 
-export enum TileType {
-	Empty,
-	Water,
-	Town,
-}
-
 export interface TileDefinition {
 	Position: AxialCoordinates;
 
 	Type: TileType;
+
+	Biome?: BrickColor;
 }
 
 export interface MapConfig {
 	Radius: number;
 	DepthScale: number;
 	TotalTowns: number;
+	GenerateBiomes?: boolean;
 	WaterLevel?: number;
 	Seed?: number;
 
 	Debug?: {
 		ShowCoords?: boolean;
+		VisualizeBiomes: boolean;
 	};
 }
 
+export type MapConfigImpl = Required<Omit<MapConfig, "Debug">> & Pick<MapConfig, "Debug">;
+
 export interface MapDefinition {
-	Config: Required<Omit<MapConfig, "Debug">> & Pick<MapConfig, "Debug">;
+	Config: MapConfigImpl;
 
 	/**
 	 * 2D Map of every tile
@@ -53,6 +54,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	}
 
 	const rand = new Random(config.Seed);
+	const biomeManager = new BiomeManager(config as MapConfigImpl);
 
 	/*
 		Terrain Generation
@@ -65,7 +67,10 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 			cubeY <= math.min(config.Radius, -cubeX + config.Radius);
 			cubeY++
 		) {
-			const cubeZ = -cubeX - cubeY;
+			let cubeZ = -cubeX - cubeY;
+			if (cubeZ === 0) {
+				cubeZ = 0;
+			}
 
 			let zMap = tiles.get(cubeX);
 			if (!zMap) {
@@ -74,7 +79,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 			}
 
 			if (zMap) {
-				let tileType = TileType.Empty;
+				let tileType = TileType.Land;
 				const axial = {
 					X: cubeX,
 					Z: cubeZ,
@@ -86,16 +91,22 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 					tileType = TileType.Water;
 				}
 
+				let biome;
+				if (config.GenerateBiomes) {
+					biome = biomeManager.getTileBiome(axial);
+				}
+
 				zMap.set(cubeZ, {
 					Position: axial,
 					Type: tileType,
+					Biome: biome,
 				});
 			}
 		}
 	}
 
 	// Flood-fill to determine which tiles make up the central island
-	const visited: Map<string, boolean> = new Map();
+	const visited = new Map<string, boolean>();
 	const toVisit: Array<AxialCoordinates> = [{ X: 0, Z: 0 }];
 	visited.set("0,0", true);
 
@@ -128,10 +139,11 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	// Remove land tiles not on the central island
 	for (const [_, zMap] of tiles) {
 		for (const [_, tile] of zMap) {
-			if (tile.Type === TileType.Empty) {
+			if (tile.Type === TileType.Land) {
 				const visitGood = visited.get(axialKey(tile.Position));
 
 				if (!visitGood) {
+					tile.Biome = undefined;
 					tile.Type = TileType.Water;
 				}
 			}
@@ -147,7 +159,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	let townExclusionZoneRetries = 0;
 
 	for (let townsGenerated = 0; townsGenerated < config.TotalTowns; ) {
-		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, TileType.Empty, rand);
+		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, TileType.Land, rand);
 
 		let newTownThisIteration = false;
 		for (const tile of townSeeds) {
@@ -197,7 +209,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	}
 
 	return {
-		Config: config as Required<MapConfig>,
+		Config: config as MapConfigImpl,
 		Tiles: tiles,
 	};
 }
@@ -267,6 +279,13 @@ export function RenderMap(mapDef: MapDefinition) {
 				textLabel.Rotation = 90;
 				textLabel.TextColor3 = new Color3(1, 1, 1);
 				textLabel.Parent = surfaceGui;
+			}
+
+			if (mapDef.Config.Debug?.VisualizeBiomes) {
+				if (tileDef.Type === TileType.Land && tileDef.Biome) {
+					newTile.Material = Enum.Material.Slate;
+					newTile.BrickColor = tileDef.Biome;
+				}
 			}
 
 			newTile.Parent = worldMap;
