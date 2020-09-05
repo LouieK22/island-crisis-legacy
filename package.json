@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "rbxtsc-dev",
-    "dev": "npm-watch"
+    "dev": "npm run incremental-clean && npm-watch",
+    "incremental-clean": "rm out/tsconfig.tsbuildinfo"
   },
   "repository": {
     "type": "git",

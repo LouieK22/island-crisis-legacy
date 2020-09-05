@@ -4,9 +4,10 @@ import { RenderMap, BuildMapDefinition } from "shared/WorldBuilder";
 const t1 = Timer("Map Generation");
 
 const mapDef = BuildMapDefinition({
-	Radius: 25,
+	Radius: 100,
 	DepthScale: 5,
 	WaterLevel: -0.4,
+	TotalTowns: 100,
 });
 
 t1();

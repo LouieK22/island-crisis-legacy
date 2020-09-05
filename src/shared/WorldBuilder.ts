@@ -1,10 +1,17 @@
-import { Workspace, ReplicatedStorage } from "@rbxts/services";
-import { AxialCoordinates, axialKey, calculateDecayingNoise, GetNearbyTileCoordinates } from "shared/HexUtil";
+import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
+import {
+	AxialCoordinates,
+	axialKey,
+	calculateDecayingNoise,
+	getNearbyCoordinates,
+	getRandomMapTiles,
+	TileMap,
+} from "shared/HexUtil";
 
 export enum TileType {
 	Empty,
 	Water,
-	Stone,
+	Town,
 }
 
 export interface TileDefinition {
@@ -16,17 +23,22 @@ export interface TileDefinition {
 export interface MapConfig {
 	Radius: number;
 	DepthScale: number;
+	TotalTowns: number;
 	WaterLevel?: number;
 	Seed?: number;
+
+	Debug?: {
+		ShowCoords?: boolean;
+	};
 }
 
 export interface MapDefinition {
-	Config: Required<MapConfig>;
+	Config: Required<Omit<MapConfig, "Debug">> & Pick<MapConfig, "Debug">;
 
 	/**
 	 * 2D Map of every tile
 	 */
-	Tiles: Map<number, Map<number, TileDefinition>>;
+	Tiles: TileMap;
 }
 
 export function BuildMapDefinition(config: MapConfig): MapDefinition {
@@ -39,6 +51,8 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	if (config.WaterLevel === undefined) {
 		config.WaterLevel = -0.4;
 	}
+
+	const rand = new Random(config.Seed);
 
 	/*
 		Terrain Generation
@@ -90,7 +104,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 		const tile = toVisit[visitIdx];
 
 		if (tile) {
-			for (const neighbor of GetNearbyTileCoordinates(tile)) {
+			for (const neighbor of getNearbyCoordinates(tile, 1)) {
 				const neighborKey = axialKey(neighbor);
 
 				if (!visited.has(neighborKey)) {
@@ -122,6 +136,64 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 				}
 			}
 		}
+	}
+
+	/*
+		Structure Generation
+	*/
+
+	// Place Towns
+	let townExclusionZoneRadius = math.min(config.Radius, 10);
+	let townExclusionZoneRetries = 0;
+
+	for (let townsGenerated = 0; townsGenerated < config.TotalTowns; ) {
+		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, TileType.Empty, rand);
+
+		let newTownThisIteration = false;
+		for (const tile of townSeeds) {
+			const neighborCoords = getNearbyCoordinates(tile.Position, townExclusionZoneRadius);
+			let canBeTown = true;
+
+			for (const coord of neighborCoords) {
+				const zMap = tiles.get(coord.X);
+				if (!zMap) {
+					continue;
+				}
+
+				const neighborTile = zMap.get(coord.Z);
+				if (!neighborTile) {
+					continue;
+				}
+
+				if (neighborTile.Type === TileType.Town) {
+					canBeTown = false;
+					break;
+				}
+			}
+
+			if (canBeTown) {
+				tile.Type = TileType.Town;
+				townsGenerated++;
+				newTownThisIteration = true;
+			}
+		}
+
+		if (!newTownThisIteration) {
+			townExclusionZoneRetries++;
+		}
+
+		if (townExclusionZoneRetries === 3) {
+			townExclusionZoneRadius--;
+			townExclusionZoneRetries = 0;
+		}
+
+		if (townExclusionZoneRadius === -1) {
+			warn(`failed to place ${config.TotalTowns} towns, only placed ${townsGenerated} towns`);
+			break;
+		}
+
+		print(`towns: ${townsGenerated} / ${config.TotalTowns}`);
+		RunService.Heartbeat.Wait();
 	}
 
 	return {
@@ -172,30 +244,34 @@ export function RenderMap(mapDef: MapDefinition) {
 					newTile.Color = Color3.fromRGB(51, 88, 130);
 
 					break;
-				case TileType.Stone:
-					newTile.Material = Enum.Material.Slate;
-					newTile.Color = Color3.fromRGB(91, 93, 105);
+				case TileType.Town:
+					newTile.Material = Enum.Material.Neon;
+					newTile.Color = Color3.fromRGB(255, 255, 0);
 
 					break;
 				default:
 					break;
 			}
 
-			// Naming
-			const surfaceGui = new Instance("SurfaceGui");
-			surfaceGui.Face = Enum.NormalId.Top;
-			surfaceGui.Parent = newTile;
+			// Debug Coords
+			if (mapDef.Config.Debug?.ShowCoords) {
+				const surfaceGui = new Instance("SurfaceGui");
+				surfaceGui.Face = Enum.NormalId.Top;
+				surfaceGui.Parent = newTile;
 
-			const textLabel = new Instance("TextLabel");
-			textLabel.Text = `${tileDef.Position.X}\n${tileDef.Position.Z}`;
-			textLabel.Size = new UDim2(1, 0, 1, 0);
-			textLabel.BackgroundTransparency = 1;
-			textLabel.TextSize = 200;
-			textLabel.Rotation = 90;
-			textLabel.TextColor3 = new Color3(1, 1, 1);
-			textLabel.Parent = surfaceGui;
+				const textLabel = new Instance("TextLabel");
+				textLabel.Text = `${tileDef.Position.X}\n${tileDef.Position.Z}`;
+				textLabel.Size = new UDim2(1, 0, 1, 0);
+				textLabel.BackgroundTransparency = 1;
+				textLabel.TextSize = 200;
+				textLabel.Rotation = 90;
+				textLabel.TextColor3 = new Color3(1, 1, 1);
+				textLabel.Parent = surfaceGui;
+			}
 
 			newTile.Parent = worldMap;
 		}
+
+		RunService.Heartbeat.Wait();
 	}
 }
