@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "rbxtsc-dev",
-    "watch": "npm-watch"
+    "dev": "npm-watch"
   },
   "repository": {
     "type": "git",

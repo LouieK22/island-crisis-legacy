@@ -4,6 +4,7 @@ import { AxialCoordinates, axialKey, calculateDecayingNoise, GetNearbyTileCoordi
 export enum TileType {
 	Empty,
 	Water,
+	Stone,
 }
 
 export interface TileDefinition {
@@ -15,6 +16,7 @@ export interface TileDefinition {
 export interface MapConfig {
 	Radius: number;
 	DepthScale: number;
+	WaterLevel?: number;
 	Seed?: number;
 }
 
@@ -32,6 +34,15 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	if (config.Seed === undefined) {
 		config.Seed = math.random();
 	}
+	print(`Seed: ${config.Seed}`);
+
+	if (config.WaterLevel === undefined) {
+		config.WaterLevel = -0.4;
+	}
+
+	/*
+		Terrain Generation
+	*/
 
 	// Create initial map
 	for (let cubeX = -config.Radius; cubeX <= config.Radius; cubeX++) {
@@ -57,7 +68,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 
 				const height = calculateDecayingNoise(axial, config.Seed, config.Radius);
 
-				if (height <= -0.4) {
+				if (height <= config.WaterLevel) {
 					tileType = TileType.Water;
 				}
 
@@ -85,7 +96,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 				if (!visited.has(neighborKey)) {
 					const height = calculateDecayingNoise(neighbor, config.Seed, config.Radius);
 
-					if (height <= -0.4) {
+					if (height <= config.WaterLevel) {
 						visited.set(neighborKey, false);
 					} else {
 						visited.set(neighborKey, true);
@@ -119,7 +130,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	};
 }
 
-export function BuildTerrain(mapDef: MapDefinition) {
+export function RenderMap(mapDef: MapDefinition) {
 	let worldMap = Workspace.FindFirstChild("WorldMap") as Folder | undefined;
 	if (!worldMap) {
 		worldMap = new Instance("Folder");
@@ -129,7 +140,7 @@ export function BuildTerrain(mapDef: MapDefinition) {
 
 	worldMap.ClearAllChildren();
 
-	const outerRadius = 5;
+	const outerRadius = ReplicatedStorage.Tile.Size.Z / 2;
 	const innerRadius = outerRadius * (math.sqrt(3) / 2);
 
 	for (const [_, rowDef] of mapDef.Tiles) {
@@ -139,7 +150,7 @@ export function BuildTerrain(mapDef: MapDefinition) {
 
 			let height = calculateDecayingNoise(tileDef.Position, mapDef.Config.Seed, mapDef.Config.Radius);
 			if (tileDef.Type === TileType.Water) {
-				height = -0.4;
+				height = mapDef.Config.WaterLevel;
 			}
 
 			const newTile = ReplicatedStorage.Tile.Clone();
@@ -159,6 +170,11 @@ export function BuildTerrain(mapDef: MapDefinition) {
 				case TileType.Water:
 					newTile.Material = Enum.Material.Plastic;
 					newTile.Color = Color3.fromRGB(51, 88, 130);
+
+					break;
+				case TileType.Stone:
+					newTile.Material = Enum.Material.Slate;
+					newTile.Color = Color3.fromRGB(91, 93, 105);
 
 					break;
 				default:

@@ -55,7 +55,7 @@ export function calculateDecayingNoise(axial: AxialCoordinates, seed: number, de
 	let yNoise = math.noise(axial.X / 6, axial.Z / 6, seed);
 	yNoise = yNoise - cubeDistance(axial) / decayCounterFactor;
 
-	return math.max(yNoise, -0.4);
+	return yNoise;
 }
 
 export function axialKey(axial: AxialCoordinates) {
