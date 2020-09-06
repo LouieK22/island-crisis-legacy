@@ -4,12 +4,11 @@ import { RenderMap, BuildMapDefinition } from "shared/WorldBuilder";
 const t1 = Timer("Map Generation");
 
 const mapDef = BuildMapDefinition({
-	Radius: 25,
+	Radius: 50,
 	DepthScale: 5,
 	WaterLevel: -0.4,
 	TotalTowns: 15,
 	GenerateBiomes: true,
-	Seed: 0.78949691885938,
 
 	Debug: {
 		ShowCoords: false,

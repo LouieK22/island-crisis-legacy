@@ -1,5 +1,6 @@
 import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
 import { Biome, BiomeManager } from "shared/BiomeManager";
+import BiomeSkins from "shared/BiomeSkins";
 import {
 	AxialCoordinates,
 	axialKey,
@@ -9,16 +10,10 @@ import {
 	TileMap,
 } from "shared/HexUtil";
 
-export enum TileType {
-	Land,
-	Water,
-	Town,
-}
-
 export interface TileDefinition {
 	Position: AxialCoordinates;
 
-	Type: TileType;
+	HasTown: boolean;
 
 	Biome: Biome;
 }
@@ -85,17 +80,12 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 			}
 
 			if (zMap) {
-				let tileType = TileType.Land;
 				const axial = {
 					X: cubeX,
 					Z: cubeZ,
 				};
 
 				const height = calculateDecayingNoise(axial, config.Seed, config.Radius);
-
-				if (height <= config.WaterLevel) {
-					tileType = TileType.Water;
-				}
 
 				let biome = Biome.Grassland;
 				if (config.GenerateBiomes) {
@@ -104,7 +94,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 
 				zMap.set(cubeZ, {
 					Position: axial,
-					Type: tileType,
+					HasTown: false,
 					Biome: biome,
 				});
 			}
@@ -145,12 +135,11 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	// Remove land tiles not on the central island
 	for (const [_, zMap] of tiles) {
 		for (const [_, tile] of zMap) {
-			if (tile.Type === TileType.Land) {
+			if (tile.Biome !== Biome.Water) {
 				const visitGood = visited.get(axialKey(tile.Position));
 
 				if (!visitGood) {
 					tile.Biome = Biome.Water;
-					tile.Type = TileType.Water;
 				}
 			}
 		}
@@ -165,7 +154,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	let townExclusionZoneRetries = 0;
 
 	for (let townsGenerated = 0; townsGenerated < config.TotalTowns; ) {
-		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, TileType.Land, rand);
+		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, Biome.Water, rand);
 
 		let newTownThisIteration = false;
 		for (const tile of townSeeds) {
@@ -183,14 +172,14 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 					continue;
 				}
 
-				if (neighborTile.Type === TileType.Town) {
+				if (neighborTile.HasTown) {
 					canBeTown = false;
 					break;
 				}
 			}
 
 			if (canBeTown) {
-				tile.Type = TileType.Town;
+				tile.HasTown = true;
 				townsGenerated++;
 				newTownThisIteration = true;
 			}
@@ -239,7 +228,7 @@ export function RenderMap(mapDef: MapDefinition) {
 			const z = tileDef.Position.Z;
 
 			let height = calculateDecayingNoise(tileDef.Position, mapDef.Config.Seed, mapDef.Config.Radius);
-			if (tileDef.Type === TileType.Water) {
+			if (tileDef.Biome === Biome.Water) {
 				height = mapDef.Config.WaterLevel;
 			}
 
@@ -251,47 +240,19 @@ export function RenderMap(mapDef: MapDefinition) {
 				z * outerRadius * 1.5,
 			);
 
-			// Type Styling
-			switch (tileDef.Type) {
-				case TileType.Land:
-					switch (tileDef.Biome) {
-						case Biome.Grassland:
-							newTile.Material = Enum.Material.Grass;
-							newTile.Color = Color3.fromRGB(39, 70, 45);
+			// Biome Styling
+			const skin = BiomeSkins[tileDef.Biome];
+			if (skin) {
+				newTile.Material = skin.Material;
+				newTile.Color = skin.Color;
+			} else {
+				warn(`no biome skin for ${Biome[tileDef.Biome]}`);
+			}
 
-							break;
-						case Biome.Desert:
-							newTile.Material = Enum.Material.Sand;
-							newTile.Color = Color3.fromRGB(248, 217, 109);
-
-							break;
-						case Biome.Tundra:
-							newTile.Material = Enum.Material.Sand;
-							newTile.Color = Color3.fromRGB(242, 243, 243);
-
-							break;
-						case Biome.Forest:
-							newTile.Material = Enum.Material.Slate;
-							newTile.Color = Color3.fromRGB(161, 196, 140);
-
-							break;
-						default:
-							break;
-					}
-
-					break;
-				case TileType.Water:
-					newTile.Material = Enum.Material.Plastic;
-					newTile.Color = Color3.fromRGB(51, 88, 130);
-
-					break;
-				case TileType.Town:
-					newTile.Material = Enum.Material.Neon;
-					newTile.Color = Color3.fromRGB(255, 255, 0);
-
-					break;
-				default:
-					break;
+			// Town Render
+			if (tileDef.HasTown) {
+				newTile.Material = Enum.Material.Neon;
+				newTile.Color = Color3.fromRGB(255, 255, 0);
 			}
 
 			// Debug Coords

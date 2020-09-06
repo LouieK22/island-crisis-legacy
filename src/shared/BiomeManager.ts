@@ -4,6 +4,7 @@ import type { MapConfigImpl } from "shared/WorldBuilder";
 export enum Biome {
 	Water,
 	Grassland,
+	Coastline,
 	Desert,
 	Tundra,
 	Forest,
@@ -12,7 +13,7 @@ export enum Biome {
 function randomBiome(rand: Random) {
 	const biomeObject = Object.values(Biome);
 
-	const min = 2;
+	const min = 3;
 	let max = -1;
 
 	biomeObject.forEach((value) => {
@@ -34,6 +35,10 @@ export class BiomeManager {
 			return Biome.Water;
 		}
 
+		if (this.tileIsCoastline(axial)) {
+			return Biome.Coastline;
+		}
+
 		if (!this.tileHasSpecialBiome(axial)) {
 			return Biome.Grassland;
 		}
@@ -46,6 +51,16 @@ export class BiomeManager {
 		const newBiome = this.createBiomeFromSeed(axial);
 
 		return newBiome;
+	}
+
+	private tileIsCoastline(axial: AxialCoordinates) {
+		for (const neighbor of getNearbyCoordinates(axial, 1)) {
+			if (this.tileHasWater(neighbor)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private tileHasWater(axial: AxialCoordinates) {

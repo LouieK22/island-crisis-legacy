@@ -1,4 +1,4 @@
-import type { TileDefinition, TileType } from "shared/WorldBuilder";
+import type { TileDefinition } from "shared/WorldBuilder";
 
 const globalRand = new Random();
 
@@ -100,7 +100,7 @@ export function getNearbyCoordinates(origin: AxialCoordinates, range: number): A
  * @param totalResults Total number of tiles to pick
  * @param type Optional filter of tiles
  */
-export function getRandomMapTiles(tiles: TileMap, totalResults: number, type?: TileType, rand = globalRand) {
+export function getRandomMapTiles(tiles: TileMap, totalResults: number, biomeExclude: number, rand = globalRand) {
 	const input = new Array<TileDefinition>();
 	const output = new Array<TileDefinition>();
 	const chosen = new Map<string, boolean>();
@@ -121,7 +121,7 @@ export function getRandomMapTiles(tiles: TileMap, totalResults: number, type?: T
 		const tile = input[index];
 
 		if (type !== undefined) {
-			if (tile.Type !== type) {
+			if (tile.Biome === biomeExclude) {
 				input.remove(index);
 				continue;
 			}
