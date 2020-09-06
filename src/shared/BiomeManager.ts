@@ -1,25 +1,45 @@
-import { RunService } from "@rbxts/services";
 import { AxialCoordinates, axialKey, calculateDecayingNoise, cubeDistance, getNearbyCoordinates } from "shared/HexUtil";
 import type { MapConfigImpl } from "shared/WorldBuilder";
 
-export enum TileType {
-	Land,
+export enum Biome {
 	Water,
-	Town,
+	Grassland,
+	Desert,
+	Tundra,
+	Forest,
+}
+
+function randomBiome(rand: Random) {
+	const biomeObject = Object.values(Biome);
+
+	const min = 2;
+	let max = -1;
+
+	biomeObject.forEach((value) => {
+		if (typeOf(value) === "number") {
+			max++;
+		}
+	});
+
+	return rand.NextInteger(min, max) as Biome;
 }
 
 export class BiomeManager {
-	private biomeCache = new Map<string, BrickColor>();
+	private biomeCache = new Map<string, Biome>();
 
-	public constructor(readonly config: MapConfigImpl) {}
+	public constructor(readonly config: MapConfigImpl, readonly rand: Random) {}
 
-	public getTileBiome(axial: AxialCoordinates): BrickColor | undefined {
-		if (!this.tileHasBiome(axial)) {
-			return undefined;
+	public getTileBiome(axial: AxialCoordinates) {
+		if (this.tileHasWater(axial)) {
+			return Biome.Water;
+		}
+
+		if (!this.tileHasSpecialBiome(axial)) {
+			return Biome.Grassland;
 		}
 
 		const cachedBiome = this.biomeCache.get(axialKey(axial));
-		if (cachedBiome) {
+		if (cachedBiome !== undefined) {
 			return cachedBiome;
 		}
 
@@ -28,12 +48,16 @@ export class BiomeManager {
 		return newBiome;
 	}
 
-	private tileHasBiome(axial: AxialCoordinates) {
+	private tileHasWater(axial: AxialCoordinates) {
 		const height = calculateDecayingNoise(axial, this.config.Seed, this.config.Radius);
 		if (height <= this.config.WaterLevel) {
-			return false;
+			return true;
 		}
 
+		return false;
+	}
+
+	private tileHasSpecialBiome(axial: AxialCoordinates) {
 		const biomeScore = math.noise(axial.X / 4, axial.Z / 4, this.config.Seed * 5) / 2 + 1;
 		if (biomeScore < 0.95) {
 			return true;
@@ -42,8 +66,9 @@ export class BiomeManager {
 		return false;
 	}
 
-	private createBiomeFromSeed(seed: AxialCoordinates): BrickColor {
-		const newBiome = BrickColor.random();
+	private createBiomeFromSeed(seed: AxialCoordinates) {
+		const newBiome = randomBiome(this.rand);
+		print(newBiome);
 
 		const biomeTiles = new Set<AxialCoordinates>();
 
@@ -67,7 +92,7 @@ export class BiomeManager {
 
 			visited.add(axialKey(tile));
 
-			if (this.tileHasBiome(tile)) {
+			if (this.tileHasSpecialBiome(tile)) {
 				biomeTiles.add(tile);
 
 				getNearbyCoordinates(tile, 1).forEach((neighbor) => {

@@ -1,5 +1,4 @@
-import { TileType } from "shared/BiomeManager";
-import type { TileDefinition } from "shared/WorldBuilder";
+import type { TileDefinition, TileType } from "shared/WorldBuilder";
 
 const globalRand = new Random();
 

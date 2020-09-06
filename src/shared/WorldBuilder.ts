@@ -1,5 +1,5 @@
 import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
-import { BiomeManager, TileType } from "shared/BiomeManager";
+import { Biome, BiomeManager } from "shared/BiomeManager";
 import {
 	AxialCoordinates,
 	axialKey,
@@ -9,12 +9,18 @@ import {
 	TileMap,
 } from "shared/HexUtil";
 
+export enum TileType {
+	Land,
+	Water,
+	Town,
+}
+
 export interface TileDefinition {
 	Position: AxialCoordinates;
 
 	Type: TileType;
 
-	Biome?: BrickColor;
+	Biome: Biome;
 }
 
 export interface MapConfig {
@@ -27,7 +33,7 @@ export interface MapConfig {
 
 	Debug?: {
 		ShowCoords?: boolean;
-		VisualizeBiomes: boolean;
+		VisualizeBiomes?: boolean;
 	};
 }
 
@@ -54,7 +60,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	}
 
 	const rand = new Random(config.Seed);
-	const biomeManager = new BiomeManager(config as MapConfigImpl);
+	const biomeManager = new BiomeManager(config as MapConfigImpl, rand);
 
 	/*
 		Terrain Generation
@@ -91,7 +97,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 					tileType = TileType.Water;
 				}
 
-				let biome;
+				let biome = Biome.Grassland;
 				if (config.GenerateBiomes) {
 					biome = biomeManager.getTileBiome(axial);
 				}
@@ -143,7 +149,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 				const visitGood = visited.get(axialKey(tile.Position));
 
 				if (!visitGood) {
-					tile.Biome = undefined;
+					tile.Biome = Biome.Water;
 					tile.Type = TileType.Water;
 				}
 			}
@@ -245,12 +251,35 @@ export function RenderMap(mapDef: MapDefinition) {
 				z * outerRadius * 1.5,
 			);
 
-			// Global Styling
-			newTile.Material = Enum.Material.Grass;
-			newTile.Color = Color3.fromRGB(39, 70, 45);
-
 			// Type Styling
 			switch (tileDef.Type) {
+				case TileType.Land:
+					switch (tileDef.Biome) {
+						case Biome.Grassland:
+							newTile.Material = Enum.Material.Grass;
+							newTile.Color = Color3.fromRGB(39, 70, 45);
+
+							break;
+						case Biome.Desert:
+							newTile.Material = Enum.Material.Sand;
+							newTile.Color = Color3.fromRGB(248, 217, 109);
+
+							break;
+						case Biome.Tundra:
+							newTile.Material = Enum.Material.Sand;
+							newTile.Color = Color3.fromRGB(242, 243, 243);
+
+							break;
+						case Biome.Forest:
+							newTile.Material = Enum.Material.Slate;
+							newTile.Color = Color3.fromRGB(161, 196, 140);
+
+							break;
+						default:
+							break;
+					}
+
+					break;
 				case TileType.Water:
 					newTile.Material = Enum.Material.Plastic;
 					newTile.Color = Color3.fromRGB(51, 88, 130);
@@ -279,13 +308,6 @@ export function RenderMap(mapDef: MapDefinition) {
 				textLabel.Rotation = 90;
 				textLabel.TextColor3 = new Color3(1, 1, 1);
 				textLabel.Parent = surfaceGui;
-			}
-
-			if (mapDef.Config.Debug?.VisualizeBiomes) {
-				if (tileDef.Type === TileType.Land && tileDef.Biome) {
-					newTile.Material = Enum.Material.Slate;
-					newTile.BrickColor = tileDef.Biome;
-				}
 			}
 
 			newTile.Parent = worldMap;
