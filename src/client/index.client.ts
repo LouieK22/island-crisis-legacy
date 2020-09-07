@@ -5,10 +5,10 @@ const t1 = Timer("Map Generation");
 
 const mapDef = BuildMapDefinition({
 	Radius: 50,
-	DepthScale: 5,
-	WaterLevel: -0.4,
-	TotalTowns: 15,
-	GenerateBiomes: true,
+	DepthScale: 8,
+	WaterLevel: -0.5,
+	TotalTowns: 40,
+	Archipelago: false,
 
 	Debug: {
 		ShowCoords: false,

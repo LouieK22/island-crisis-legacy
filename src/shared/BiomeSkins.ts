@@ -22,26 +22,20 @@ const BiomeSkins: BiomeSkins = {
 
 	// Coastline
 	[2]: {
-		Material: Enum.Material.Slate,
-		Color: Color3.fromRGB(255, 0, 0),
-	},
-
-	// Desert
-	[3]: {
 		Material: Enum.Material.Sand,
-		Color: Color3.fromRGB(248, 217, 109),
+		Color: Color3.fromRGB(253, 234, 141),
 	},
 
-	// Tundra
-	[4]: {
+	// MountainSnow
+	[3]: {
 		Material: Enum.Material.Sand,
 		Color: Color3.fromRGB(242, 243, 243),
 	},
 
-	// Forest:
-	[5]: {
+	// Mountain:
+	[4]: {
 		Material: Enum.Material.Slate,
-		Color: Color3.fromRGB(161, 196, 140),
+		Color: Color3.fromRGB(99, 95, 98),
 	},
 };
 

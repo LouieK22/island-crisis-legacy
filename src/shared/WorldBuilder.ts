@@ -1,4 +1,4 @@
-import { Workspace, ReplicatedStorage, RunService } from "@rbxts/services";
+import { ReplicatedStorage, RunService, Workspace } from "@rbxts/services";
 import { Biome, BiomeManager } from "shared/BiomeManager";
 import BiomeSkins from "shared/BiomeSkins";
 import {
@@ -22,9 +22,9 @@ export interface MapConfig {
 	Radius: number;
 	DepthScale: number;
 	TotalTowns: number;
-	GenerateBiomes?: boolean;
 	WaterLevel?: number;
 	Seed?: number;
+	Archipelago?: boolean;
 
 	Debug?: {
 		ShowCoords?: boolean;
@@ -44,16 +44,27 @@ export interface MapDefinition {
 }
 
 export function BuildMapDefinition(config: MapConfig): MapDefinition {
-	const tiles: Map<number, Map<number, TileDefinition>> = new Map();
-	if (config.Seed === undefined) {
-		config.Seed = math.random();
-	}
-	print(`Seed: ${config.Seed}`);
-
 	if (config.WaterLevel === undefined) {
 		config.WaterLevel = -0.4;
 	}
 
+	if (config.Seed === undefined) {
+		for (;;) {
+			config.Seed = math.random();
+
+			const rand = new Random(config.Seed);
+			const biomeManager = new BiomeManager(config as MapConfigImpl, rand);
+
+			const biome = biomeManager.getTileBiome({ X: 0, Z: 0 });
+
+			if (biome === Biome.MountainSnow) {
+				break;
+			}
+		}
+	}
+	print(`Seed: ${config.Seed}`);
+
+	const tiles: Map<number, Map<number, TileDefinition>> = new Map();
 	const rand = new Random(config.Seed);
 	const biomeManager = new BiomeManager(config as MapConfigImpl, rand);
 
@@ -85,12 +96,7 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 					Z: cubeZ,
 				};
 
-				const height = calculateDecayingNoise(axial, config.Seed, config.Radius);
-
-				let biome = Biome.Grassland;
-				if (config.GenerateBiomes) {
-					biome = biomeManager.getTileBiome(axial);
-				}
+				const biome = biomeManager.getTileBiome(axial);
 
 				zMap.set(cubeZ, {
 					Position: axial,
@@ -101,45 +107,48 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 		}
 	}
 
-	// Flood-fill to determine which tiles make up the central island
-	const visited = new Map<string, boolean>();
-	const toVisit: Array<AxialCoordinates> = [{ X: 0, Z: 0 }];
-	visited.set("0,0", true);
+	// Cull outliers if Archipelago is disabled
+	if (!config.Archipelago) {
+		// Flood-fill to determine which tiles make up the central island
+		const visited = new Map<string, boolean>();
+		const toVisit: Array<AxialCoordinates> = [{ X: 0, Z: 0 }];
+		visited.set("0,0", true);
 
-	let visitIdx = 0;
-	for (;;) {
-		const tile = toVisit[visitIdx];
+		let visitIdx = 0;
+		for (;;) {
+			const tile = toVisit[visitIdx];
 
-		if (tile) {
-			for (const neighbor of getNearbyCoordinates(tile, 1)) {
-				const neighborKey = axialKey(neighbor);
+			if (tile) {
+				for (const neighbor of getNearbyCoordinates(tile, 1)) {
+					const neighborKey = axialKey(neighbor);
 
-				if (!visited.has(neighborKey)) {
-					const height = calculateDecayingNoise(neighbor, config.Seed, config.Radius);
+					if (!visited.has(neighborKey)) {
+						const height = calculateDecayingNoise(neighbor, config as MapConfigImpl);
 
-					if (height <= config.WaterLevel) {
-						visited.set(neighborKey, false);
-					} else {
-						visited.set(neighborKey, true);
-						toVisit.push(neighbor);
+						if (height <= config.WaterLevel) {
+							visited.set(neighborKey, false);
+						} else {
+							visited.set(neighborKey, true);
+							toVisit.push(neighbor);
+						}
 					}
 				}
+
+				visitIdx++;
+			} else {
+				break;
 			}
-
-			visitIdx++;
-		} else {
-			break;
 		}
-	}
 
-	// Remove land tiles not on the central island
-	for (const [_, zMap] of tiles) {
-		for (const [_, tile] of zMap) {
-			if (tile.Biome !== Biome.Water) {
-				const visitGood = visited.get(axialKey(tile.Position));
+		// Remove land tiles not on the central island
+		for (const [_, zMap] of tiles) {
+			for (const [_, tile] of zMap) {
+				if (tile.Biome !== Biome.Water) {
+					const visitGood = visited.get(axialKey(tile.Position));
 
-				if (!visitGood) {
-					tile.Biome = Biome.Water;
+					if (!visitGood) {
+						tile.Biome = Biome.Water;
+					}
 				}
 			}
 		}
@@ -153,8 +162,12 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 	let townExclusionZoneRadius = math.min(config.Radius, 10);
 	let townExclusionZoneRetries = 0;
 
+	const biomeIncludes = new Set([Biome.Coastline, Biome.Grassland]);
+
 	for (let townsGenerated = 0; townsGenerated < config.TotalTowns; ) {
-		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, Biome.Water, rand);
+		const townSeeds = getRandomMapTiles(tiles, config.TotalTowns - townsGenerated, rand, {
+			Include: biomeIncludes,
+		});
 
 		let newTownThisIteration = false;
 		for (const tile of townSeeds) {
@@ -176,9 +189,34 @@ export function BuildMapDefinition(config: MapConfig): MapDefinition {
 					canBeTown = false;
 					break;
 				}
+
+				if (tile.HasTown) {
+					canBeTown = false;
+					break;
+				}
 			}
 
-			if (canBeTown) {
+			const waterCheckNeighbors = getNearbyCoordinates(tile.Position, 1);
+
+			let landNearby = false;
+			for (const coord of waterCheckNeighbors) {
+				const zMap = tiles.get(coord.X);
+				if (!zMap) {
+					continue;
+				}
+
+				const neighborTile = zMap.get(coord.Z);
+				if (!neighborTile) {
+					continue;
+				}
+
+				if (neighborTile.Biome !== Biome.Water) {
+					landNearby = true;
+					break;
+				}
+			}
+
+			if (canBeTown && landNearby) {
 				tile.HasTown = true;
 				townsGenerated++;
 				newTownThisIteration = true;
@@ -227,7 +265,7 @@ export function RenderMap(mapDef: MapDefinition) {
 			const x = tileDef.Position.X;
 			const z = tileDef.Position.Z;
 
-			let height = calculateDecayingNoise(tileDef.Position, mapDef.Config.Seed, mapDef.Config.Radius);
+			let height = calculateDecayingNoise(tileDef.Position, mapDef.Config);
 			if (tileDef.Biome === Biome.Water) {
 				height = mapDef.Config.WaterLevel;
 			}

@@ -1,4 +1,4 @@
-import type { TileDefinition } from "shared/WorldBuilder";
+import type { MapConfigImpl, TileDefinition } from "shared/WorldBuilder";
 
 const globalRand = new Random();
 
@@ -41,9 +41,11 @@ export function cubeDistance(axial: AxialCoordinates) {
 	return math.max(math.abs(cube.X), math.abs(cube.Y), math.abs(cube.Z));
 }
 
-export function calculateDecayingNoise(axial: AxialCoordinates, seed: number, decayCounterFactor: number) {
-	let yNoise = math.noise(axial.X / 6, axial.Z / 6, seed);
-	yNoise = yNoise - cubeDistance(axial) / decayCounterFactor;
+export function calculateDecayingNoise(axial: AxialCoordinates, config: MapConfigImpl) {
+	const scaleFactor = (config.Radius / 25) * 1.5 + 6;
+
+	let yNoise = math.noise(axial.X / scaleFactor, axial.Z / scaleFactor, config.Seed);
+	yNoise = yNoise - cubeDistance(axial) / (config.Radius * 0.95);
 
 	return yNoise;
 }
@@ -92,6 +94,14 @@ export function getNearbyCoordinates(origin: AxialCoordinates, range: number): A
 	return output;
 }
 
+export type BiomeFilter =
+	| {
+			Include: Set<number>;
+	  }
+	| {
+			Exclude: Set<number>;
+	  };
+
 /**
  * Get a random set of tiles in the map without duplicates.
  * Heads up, this function is O(n) where n is the total number of tiles.
@@ -100,7 +110,7 @@ export function getNearbyCoordinates(origin: AxialCoordinates, range: number): A
  * @param totalResults Total number of tiles to pick
  * @param type Optional filter of tiles
  */
-export function getRandomMapTiles(tiles: TileMap, totalResults: number, biomeExclude: number, rand = globalRand) {
+export function getRandomMapTiles(tiles: TileMap, totalResults: number, rand = globalRand, filter?: BiomeFilter) {
 	const input = new Array<TileDefinition>();
 	const output = new Array<TileDefinition>();
 	const chosen = new Map<string, boolean>();
@@ -120,10 +130,17 @@ export function getRandomMapTiles(tiles: TileMap, totalResults: number, biomeExc
 		const index = rand.NextInteger(0, input.size() - 1);
 		const tile = input[index];
 
-		if (type !== undefined) {
-			if (tile.Biome === biomeExclude) {
-				input.remove(index);
-				continue;
+		if (filter) {
+			if ("Include" in filter) {
+				if (!filter.Include.has(tile.Biome)) {
+					input.remove(index);
+					continue;
+				}
+			} else {
+				if (filter.Exclude.has(tile.Biome)) {
+					input.remove(index);
+					continue;
+				}
 			}
 		}
 

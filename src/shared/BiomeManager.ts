@@ -5,9 +5,8 @@ export enum Biome {
 	Water,
 	Grassland,
 	Coastline,
-	Desert,
-	Tundra,
-	Forest,
+	MountainSnow,
+	Mountain,
 }
 
 function randomBiome(rand: Random) {
@@ -39,18 +38,27 @@ export class BiomeManager {
 			return Biome.Coastline;
 		}
 
-		if (!this.tileHasSpecialBiome(axial)) {
-			return Biome.Grassland;
+		const height = calculateDecayingNoise(axial, this.config);
+		if (height > 0.2) {
+			return Biome.MountainSnow;
+		} else if (height > 0) {
+			return Biome.Mountain;
 		}
 
-		const cachedBiome = this.biomeCache.get(axialKey(axial));
-		if (cachedBiome !== undefined) {
-			return cachedBiome;
-		}
+		return Biome.Grassland;
 
-		const newBiome = this.createBiomeFromSeed(axial);
+		// if (!this.tileHasSpecialBiome(axial)) {
+		// 	return Biome.Grassland;
+		// }
 
-		return newBiome;
+		// const cachedBiome = this.biomeCache.get(axialKey(axial));
+		// if (cachedBiome !== undefined) {
+		// 	return cachedBiome;
+		// }
+
+		// const newBiome = this.createBiomeFromSeed(axial);
+
+		// return newBiome;
 	}
 
 	private tileIsCoastline(axial: AxialCoordinates) {
@@ -64,7 +72,7 @@ export class BiomeManager {
 	}
 
 	private tileHasWater(axial: AxialCoordinates) {
-		const height = calculateDecayingNoise(axial, this.config.Seed, this.config.Radius);
+		const height = calculateDecayingNoise(axial, this.config);
 		if (height <= this.config.WaterLevel) {
 			return true;
 		}
@@ -83,7 +91,6 @@ export class BiomeManager {
 
 	private createBiomeFromSeed(seed: AxialCoordinates) {
 		const newBiome = randomBiome(this.rand);
-		print(newBiome);
 
 		const biomeTiles = new Set<AxialCoordinates>();
 
