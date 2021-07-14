@@ -19,27 +19,39 @@ export interface TileDefinition {
 }
 
 export interface MapConfig {
+	/** Hexagonal radius of map */
 	Radius: number;
+
+	/** Vertical map scale factor; Purely visual */
 	DepthScale: number;
+
+	/** Total amount of towns to attempt to create on the map */
 	TotalTowns: number;
+
+	/** All tiles at or below this height will become water */
 	WaterLevel?: number;
+
+	/** Seed for map generation */
 	Seed?: number;
+
+	/** Disables culling of disconnected areas of land */
 	Archipelago?: boolean;
 
+	/** Misc debug settings */
 	Debug?: {
+		/** Shows each tile's coordinates on top of it */
 		ShowCoords?: boolean;
-		VisualizeBiomes?: boolean;
 	};
 }
 
+/** Forces everything except debug settings to be defined */
 export type MapConfigImpl = Required<Omit<MapConfig, "Debug">> & Pick<MapConfig, "Debug">;
 
 export interface MapDefinition {
+	/** Config used in map rendering */
 	Config: MapConfigImpl;
 
-	/**
-	 * 2D Map of every tile
-	 */
+	/** 2D map of tiles */
 	Tiles: TileMap;
 }
 

@@ -104,8 +104,7 @@ export type BiomeFilter =
 
 /**
  * Get a random set of tiles in the map without duplicates.
- * Heads up, this function is O(n) where n is the total number of tiles.
- * tl;dr terrible performance implications, use sparingly.
+ * Heads up, this function has terrible performance, use sparingly
  * @param map MapDefinition to read tiles from
  * @param totalResults Total number of tiles to pick
  * @param type Optional filter of tiles
